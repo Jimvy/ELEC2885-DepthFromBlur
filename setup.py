@@ -5,6 +5,8 @@ setup(
     packages=['Lazybot'],
     include_package_data=True,
     install_requires=[
-        'numpy', 'astropy', 'matplotlib', 'scipy', 'scikit-image', 'pillow'
+        'numpy', 'astropy', 'matplotlib', 'scipy',
+        'future', 'imageio', 'cython',  'pyfftw',
+        'scikit-image', 'pillow', 'sporco'
     ],
 )
