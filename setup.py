@@ -7,6 +7,6 @@ setup(
     install_requires=[
         'numpy', 'astropy', 'matplotlib', 'scipy',
         'future', 'imageio', 'cython',  'pyfftw',
-        'scikit-image', 'pillow', 'sporco'
+        'pillow', 'PyWavelets', 'pyunlocbox'
     ],
 )
