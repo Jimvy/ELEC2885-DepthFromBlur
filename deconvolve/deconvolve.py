@@ -173,8 +173,11 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
     solver.f = [1]
     solver.g = [1]
     ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-2, maxit=20, verbosity='HIGH')
-    img_reconstructed = ret['sol']
+    coefficients_solution = ret['sol']
     print("Number of iterations: ".format(ret['niter']))
+    alpha = coefficients_solution[:alpha_size]
+    depths = coefficients_solution[alpha_size:]
+    img_reconstructed = compute_approx_single_depth(alpha, depths[0])
 
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(50, 50))
     plt.gray()
