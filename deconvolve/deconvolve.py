@@ -47,6 +47,12 @@ def circular_filter(radius=5):
 
 def run(pathname, filter_type='gaussian', patch_size=64, max_iter=200, wavelet_type='haar', lambda_s=0.01, initial_depth=3, base_increment=1e-3):
 
+    patch_size = int(patch_size)
+    max_iter = int(max_iter)
+    lambda_s = float(lambda_s)
+    initial_depth = int(initial_depth)
+    base_increment = float(base_increment)
+
     wavelet = pywt.Wavelet(wavelet_type)
 
     img = Image.open(pathname)
@@ -182,7 +188,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, max_iter=200, wavelet_t
     solver = solvers.generalized_forward_backward(step=1)
     solver.f = [1]
     solver.g = [1]
-    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-2, maxit=max_iter, verbosity='HIGH')
+    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-6, maxit=max_iter, verbosity='HIGH')
     coefficients_solution = ret['sol']
     print("Number of iterations: ".format(ret['niter']))
     alpha = coefficients_solution[:alpha_size]
