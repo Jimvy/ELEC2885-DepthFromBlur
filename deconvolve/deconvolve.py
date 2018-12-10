@@ -10,6 +10,9 @@ from pyunlocbox import solvers, functions
 from PIL import Image
 
 
+def throwNotImplemented(x, T):
+    raise NotImplementedError()
+
 def gaussian_filter(shape=(3, 3), sigma=0.5):
     m, n = [(ss-1.)/2. for ss in shape]
     y, x = np.ogrid[-m:m+1, -n:n+1]
@@ -34,7 +37,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
 
     img = Image.open(pathname)
     img = np.array(img)
-    Y = img  # objective value
+    Y = img.reshape(-1, 1)  # objective value
 
     def build_mask():
         num_patch_x, num_patch_y = np.ceil(float(img.shape[0])/patch_size), np.ceil(float(img.shape[1])/patch_size)
@@ -49,43 +52,51 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
 
     # mask = build_mask()
     mask = np.ones((1, img.size))
+    dumb_coeffs = pywt.wavedec2(img, wavelet)
+    dumb_alpha, coeffs_slice = pywt.coeffs_to_array(dumb_coeffs)
+    alpha_size = dumb_alpha.size
+    alpha_shape = dumb_alpha.shape
 
-    def compute_approx_single_depth(alpha, coeff_slice, d):
+    def compute_approx_single_depth(alpha, d):
         """alpha should be 2-D"""
-        coeffs = pywt.array_to_coeffs(alpha, coeff_slice, 'wavedec2')
+        alpha = alpha.reshape(alpha_shape)
+        coeffs = pywt.array_to_coeffs(alpha, coeffs_slice, 'wavedec2')
         X = pywt.waverec2(coeffs, wavelet=wavelet)
-        k = None
         if filter_type == 'gaussian':
             k = gaussian_filter(sigma=d)
         else:
             k = circular_filter(radius=d)
-        Y = signal.convolve2d(X, k)
+        Y = signal.convolve2d(X, k, mode='same')
         return Y
 
     # The following is a test
     img_no_blurry = np.array(Image.open(pathname.replace('blurry', 'original')))
     coeffs = pywt.wavedec2(img_no_blurry, wavelet)
-    alpha, coeffs_slice = pywt.coeffs_to_array(coeffs)
-    X_hat_from_no_blurry = compute_approx_single_depth(alpha, coeffs_slice, 3)
+    print('A' + str(coeffs))
+    alpha, coeffs_slice2 = pywt.coeffs_to_array(coeffs)
+    print('A' + str(alpha))
+    print('A' + str(coeffs_slice2))
+    X_hat_from_no_blurry = compute_approx_single_depth(alpha, 3)
 
-    dumb_coeffs = pywt.wavedec2(img, wavelet)
-    dumb_alpha, coeffs_slice = pywt.coeffs_to_array(dumb_coeffs)
-    alpha_size = dumb_alpha.size
-    num_depths = 3
+    # num_depths = 3
     num_segmentations = mask.shape[0]
 
     n = alpha_size + num_segmentations
-    x0 = np.zeros(n)
+    x0 = np.zeros((n, 1))
     x0[alpha_size:] = initial_depth
+    print(x0.shape)
 
     def compute_X_hat(x):
         alpha = x[0:alpha_size]
-        depths_params = x[alpha_size:alpha_size+num_depths]
-        X_hat = compute_approx_single_depth(alpha, coeffs_slice, depths_params[0])
+        depths_params = x[alpha_size:]
+        X_hat = compute_approx_single_depth(alpha, depths_params[0])
         return X_hat
 
+    def compute_X_hat2(x):
+        return compute_X_hat(x).reshape(-1, 1)
+
     def error_term(x):
-        X_hat = compute_X_hat(x)
+        X_hat = compute_X_hat2(x)
         return np.sum((X_hat - Y)**2)
 
     """
@@ -98,7 +109,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
     class MyNorm2(functions.norm_l2):
         def __init__(self, **kwargs):
             super(MyNorm2, self).__init__(**kwargs)
-            self.A = compute_X_hat
+            self.A = compute_X_hat2
 
         def eval(self, x):
             return error_term(x)
@@ -109,7 +120,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
             return tmp
 
     error_func = MyNorm2(y=Y)
-    error_func.prox = None # Remove it
+    error_func.prox = throwNotImplemented
     # error_func.cap = lambda x: ["eval"]
     # error_func.eval = lambda x: error_term(x)
     # TODO add grad and prox
@@ -136,7 +147,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
     # alpha_sparsity2 = functions.norm_l1(lambda_=lambda_s)
 
     solver = solvers.generalized_forward_backward()
-    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-4, maxit=300, verbosity='ALL')
+    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-4, maxit=300, verbosity='LOW')
     img_reconstructed = ret['sol']
     print("Number of iterations".format(ret['niter']))
 
