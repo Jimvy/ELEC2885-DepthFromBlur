@@ -151,13 +151,15 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
 
         def eval(self, x):
             print("norm 1 eval")
-            return alpha_sparsity1(x)
+            tmp = alpha_sparsity1(x)
+            return tmp
 
         def prox(self, x, T):
             alpha = x[0:alpha_size]
             tmp = super(MyNorm1, self).prox(alpha, T)
             tmp2 = np.zeros((tmp.size + 1, 1))
             tmp2[:tmp.size] = tmp
+            return tmp2
 
     alpha_sparsity_func = MyNorm1(lambda_=lambda_s)
     # alpha_sparsity_func.cap = lambda x: ["eval"]
