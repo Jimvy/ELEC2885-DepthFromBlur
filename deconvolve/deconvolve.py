@@ -9,12 +9,24 @@ from pyunlocbox import solvers, functions
 
 from PIL import Image
 
+gaussian_filters_list = {}
+
 
 def throwNotImplemented(x, T):
     raise NotImplementedError()
 
 
-def gaussian_filter(shape=(3, 3), sigma=0.5):
+def gaussian_filter(shape=(10, 10), sigma=0.5):
+    try:
+        sigma = sigma[0]
+    except Exception:
+        pass
+    try:
+        sigma = sigma[0]
+    except Exception:
+        pass
+    if (sigma, shape) in gaussian_filters_list:
+        return gaussian_filters_list[(sigma, shape)]
     m, n = [(ss-1.)/2. for ss in shape]
     y, x = np.ogrid[-m:m+1, -n:n+1]
     h = np.exp(-(x*x + y*y)/(2. *sigma*sigma))
@@ -22,6 +34,7 @@ def gaussian_filter(shape=(3, 3), sigma=0.5):
     sumh = h.sum()
     if sumh != 0:
         h /= sumh
+    gaussian_filters_list[(sigma, shape)] = h
     return h
 
 
@@ -32,7 +45,7 @@ def circular_filter(radius=5):
     return disk.astype(float)
 
 
-def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', lambda_s=0.1, initial_depth=3, base_increment=1e-3):
+def run(pathname, filter_type='gaussian', patch_size=64, max_iter=200, wavelet_type='haar', lambda_s=0.01, initial_depth=3, base_increment=1e-3):
 
     wavelet = pywt.Wavelet(wavelet_type)
 
@@ -111,11 +124,8 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
         def __init__(self, **kwargs):
             super(MyNorm2, self).__init__(**kwargs)
             self.A = compute_X_hat2
-            self.inc = 0
 
         def eval(self, x):
-            print("norm 2 eval {}".format(self.inc))
-            self.inc += 1
             err = error_term(x)
             return err
 
@@ -169,10 +179,10 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
 
     # alpha_sparsity2 = functions.norm_l1(lambda_=lambda_s)
 
-    solver = solvers.generalized_forward_backward()
+    solver = solvers.generalized_forward_backward(step=1)
     solver.f = [1]
     solver.g = [1]
-    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-2, maxit=20, verbosity='HIGH')
+    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-2, maxit=max_iter, verbosity='HIGH')
     coefficients_solution = ret['sol']
     print("Number of iterations: ".format(ret['niter']))
     alpha = coefficients_solution[:alpha_size]
