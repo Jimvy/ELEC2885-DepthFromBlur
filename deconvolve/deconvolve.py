@@ -13,10 +13,11 @@ from PIL import Image
 def throwNotImplemented(x, T):
     raise NotImplementedError()
 
+
 def gaussian_filter(shape=(3, 3), sigma=0.5):
     m, n = [(ss-1.)/2. for ss in shape]
     y, x = np.ogrid[-m:m+1, -n:n+1]
-    h = np.exp( -(x*x + y*y)/(2. *sigma*sigma))
+    h = np.exp(-(x*x + y*y)/(2. *sigma*sigma))
     h[h < np.finfo(h.dtype).eps*h.max()] = 0
     sumh = h.sum()
     if sumh != 0:
@@ -115,16 +116,17 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
         def eval(self, x):
             print("norm 2 eval {}".format(self.inc))
             self.inc += 1
-            return error_term(x)
+            err = error_term(x)
+            return err
 
         def grad(self, x):
             # raise NotImplementedError()
             grad = np.zeros(x.shape)
             cur = self.eval(x)
             for i in range(x.size):
-                x2 = x[:]
+                x2 = np.copy(x)
                 x2[i] += base_increment
-                new = self.eval(x)
+                new = self.eval(x2)
                 grad[i] = (new-cur)/base_increment
             return grad
             # sol = 2 * (self.A(x) - self.y)
@@ -133,7 +135,6 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
             # return tmp
 
         # def prox(self, x, T):
-
 
     error_func = MyNorm2(y=Y)
     error_func.prox = throwNotImplemented
@@ -159,6 +160,7 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
             tmp = super(MyNorm1, self).prox(alpha, T)
             tmp2 = np.zeros((tmp.size + 1, 1))
             tmp2[:tmp.size] = tmp
+            tmp2[tmp.size] = x[alpha_size]
             return tmp2
 
     alpha_sparsity_func = MyNorm1(lambda_=lambda_s)
