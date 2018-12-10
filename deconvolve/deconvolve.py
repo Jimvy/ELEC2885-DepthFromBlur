@@ -31,7 +31,7 @@ def circular_filter(radius=5):
     return disk.astype(float)
 
 
-def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', lambda_s=0.1, initial_depth=3):
+def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', lambda_s=0.1, initial_depth=3, base_increment=1e-3):
 
     wavelet = pywt.Wavelet(wavelet_type)
 
@@ -72,10 +72,10 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
     # The following is a test
     img_no_blurry = np.array(Image.open(pathname.replace('blurry', 'original')))
     coeffs = pywt.wavedec2(img_no_blurry, wavelet)
-    print('A' + str(coeffs))
+    # print('A' + str(coeffs))
     alpha, coeffs_slice2 = pywt.coeffs_to_array(coeffs)
-    print('A' + str(alpha))
-    print('A' + str(coeffs_slice2))
+    # print('A' + str(alpha))
+    # print('A' + str(coeffs_slice2))
     X_hat_from_no_blurry = compute_approx_single_depth(alpha, 3)
 
     # num_depths = 3
@@ -110,14 +110,30 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
         def __init__(self, **kwargs):
             super(MyNorm2, self).__init__(**kwargs)
             self.A = compute_X_hat2
+            self.inc = 0
 
         def eval(self, x):
+            print("norm 2 eval {}".format(self.inc))
+            self.inc += 1
             return error_term(x)
 
         def grad(self, x):
-            tmp = super(MyNorm2, self).grad(x)
-            tmp[alpha_size:] = 0 # Otherwise we will move out of the coefficient
-            return tmp
+            # raise NotImplementedError()
+            grad = np.zeros(x.shape)
+            cur = self.eval(x)
+            for i in range(x.size):
+                x2 = x[:]
+                x2[i] += base_increment
+                new = self.eval(x)
+                grad[i] = (new-cur)/base_increment
+            return grad
+            # sol = 2 * (self.A(x) - self.y)
+            # tmp = super(MyNorm2, self).grad(x)
+            # tmp[alpha_size:] = 0  # Otherwise we will move out of the coefficient
+            # return tmp
+
+        # def prox(self, x, T):
+
 
     error_func = MyNorm2(y=Y)
     error_func.prox = throwNotImplemented
@@ -134,11 +150,14 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
             super(MyNorm1, self).__init__(**kwargs)
 
         def eval(self, x):
+            print("norm 1 eval")
             return alpha_sparsity1(x)
 
         def prox(self, x, T):
             alpha = x[0:alpha_size]
-            return super(MyNorm1, self).prox(alpha, T)
+            tmp = super(MyNorm1, self).prox(alpha, T)
+            tmp2 = np.zeros((tmp.size + 1, 1))
+            tmp2[:tmp.size] = tmp
 
     alpha_sparsity_func = MyNorm1(lambda_=lambda_s)
     # alpha_sparsity_func.cap = lambda x: ["eval"]
@@ -147,31 +166,35 @@ def run(pathname, filter_type='gaussian', patch_size=64, wavelet_type='haar', la
     # alpha_sparsity2 = functions.norm_l1(lambda_=lambda_s)
 
     solver = solvers.generalized_forward_backward()
-    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-4, maxit=300, verbosity='LOW')
+    solver.f = [1]
+    solver.g = [1]
+    ret = solvers.solve([error_func, alpha_sparsity_func], x0, solver, rtol=1e-2, maxit=20, verbosity='HIGH')
     img_reconstructed = ret['sol']
-    print("Number of iterations".format(ret['niter']))
+    print("Number of iterations: ".format(ret['niter']))
 
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(50, 50))
     plt.gray()
 
-    for a in (ax[0], ax[1], ax[2], ax[3]):
+    for a in (ax[0][0], ax[0][1], ax[1][0], ax[1][1]):
         a.axis('off')
 
-    ax[0].imshow(img)
-    ax[0].set_title('Blurry Data')
+    ax[0][0].imshow(img)
+    ax[0][0].set_title('Blurry Data')
 
-    ax[1].imshow(X_hat_from_no_blurry)
-    ax[1].set_title('Blurried image from the no-blurry image')
+    ax[0][1].imshow(X_hat_from_no_blurry)
+    ax[0][1].set_title('Blurried image from the no-blurry image')
 
-    ax[2].imshow(img_no_blurry)
-    ax[2].set_title('original')
+    ax[1][0].imshow(img_no_blurry)
+    ax[1][0].set_title('original')
 
-    ax[3].imshow(img_reconstructed)
-    ax[3].set_title('reconstructed image')
+    ax[1][1].imshow(img_reconstructed)
+    ax[1][1].set_title('reconstructed image')
 
     fig.subplots_adjust(wspace=0.02, hspace=0.2,
                         top=0.9, bottom=0.05, left=0, right=1)
+    print('plot3')
     plt.show()
+    print('plot4')
 
 
 if __name__ == '__main__':
